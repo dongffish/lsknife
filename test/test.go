@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"gitee.com/dongffish/lsknife/database"
+	"gitee.com/dongffish/lsknife/database/mssql"
 	"gitee.com/dongffish/lsknife/database/mysql"
 	"gitee.com/dongffish/lsknife/database/pgsql"
 	"gitee.com/dongffish/lsknife/database/sqlite"
@@ -11,13 +13,42 @@ import (
 func main() {
 	//MySQLTest()
 	//SQLiteTest()
-	PGSQLTest()
+
+	dbcfg, err := database.ReadDBConfig("DATABASE", "")
+	if err != nil {
+		fmt.Println("读取配置失败!", err)
+		return
+	}
+	if dbcfg.DBType == "mysql" {
+		MySQLTest()
+	}
+	if dbcfg.DBType == "pgsql" {
+		PGSQLTest()
+	}
+	if dbcfg.DBType == "mssql" {
+		MssqlTest()
+	}
 }
 
 func MySQLTest() {
 	lslog.Logger.Infoln(lslog.GetLogPrefix(), "Hello MYSql !")
-
 	db, err := mysql.GormMysql("DATABASE", "")
+	if err != nil {
+		lslog.Logger.Errorln(err)
+		return
+	}
+	fmt.Println("db open success !", db)
+	defer func() {
+		db1, _ := db.DB() // 程序结束前关闭数据库链接
+		_ = db1.Close()
+		fmt.Println("db closed")
+	}()
+
+}
+
+func MssqlTest() {
+	lslog.Logger.Infoln(lslog.GetLogPrefix(), "Hello MicroSoft SQL Server !")
+	db, err := mssql.GormMssql("DATABASE", "")
 	if err != nil {
 		lslog.Logger.Errorln(err)
 		return
