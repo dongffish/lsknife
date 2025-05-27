@@ -28,10 +28,28 @@ func main() {
 	if dbcfg.DBType == "mssql" {
 		MssqlTest()
 	}
+	if dbcfg.DBType == "oracle" {
+		OracleTest()
+	}
 }
 
 func MySQLTest() {
 	lslog.Logger.Infoln(lslog.GetLogPrefix(), "Hello MYSql !")
+	db, err := mysql.GormMysql("DATABASE", "")
+	if err != nil {
+		lslog.Logger.Errorln(err)
+		return
+	}
+	fmt.Println("db open success !", db)
+	defer func() {
+		db1, _ := db.DB() // 程序结束前关闭数据库链接
+		_ = db1.Close()
+		fmt.Println("db closed")
+	}()
+
+}
+func OracleTest() {
+	lslog.Logger.Infoln(lslog.GetLogPrefix(), "Hello Oracle Database !")
 	db, err := mysql.GormMysql("DATABASE", "")
 	if err != nil {
 		lslog.Logger.Errorln(err)

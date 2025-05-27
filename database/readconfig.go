@@ -25,6 +25,7 @@ type DBConfig struct {
 	ShowSQL         int    //执行时是否显示SQL, 1-是  0-否
 	//DiscardLog      bool   //`xml:"DiscardLog"`
 	ConnString string // 数据库连接字符串
+	HostIP     string // 本机IP，放在[SYSTEM]段
 }
 
 func ReadDBConfig(dbSection, PasswordDecryptionKey string) (*DBConfig, error) {
@@ -44,17 +45,22 @@ func ReadDBConfig(dbSection, PasswordDecryptionKey string) (*DBConfig, error) {
 		return nil, fmt.Errorf("解析配置文件失败: %v", err)
 	}
 
-	// 获取指定分区的 DBType 配置
-	section := cfg.Section(dbSection)
-	if section == nil {
-		return nil, errors.New("配置分区不存在: " + dbSection)
-	}
-
 	dbCfg := &DBConfig{
 		MaxOpenConns:    100, //用于设置最大打开的连接数，值为0表示不限制
 		MaxIdleConns:    100, //用于设置闲置的连接数,建议MaxOpenConns的值等于MaxIdleConns
 		ConnMaxLifetime: 100, //通过SetConnMaxLifetime来关闭空闲连接 (秒).给db设置一个超时时间，时间小于数据库的超时时间即可
 	}
+	section := cfg.Section("SYSTEM")
+	if section != nil {
+		dbCfg.HostIP = section.Key("HostIP").String()
+	}
+
+	// 获取指定分区的 DBType 配置
+	section = cfg.Section(dbSection)
+	if section == nil {
+		return nil, errors.New("配置分区不存在: " + dbSection)
+	}
+
 	dbCfg.DBType = section.Key("DBType").String()
 	if dbCfg.DBType == "" {
 		dbCfg.DBType = "mysql"
@@ -91,6 +97,9 @@ func ReadDBConfig(dbSection, PasswordDecryptionKey string) (*DBConfig, error) {
 		dbCfg.ConnString = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", dbCfg.DBHost, dbCfg.DBUser, dbCfg.DBPassword, dbCfg.Database, dbCfg.DBPort)
 	case "mssql":
 		dbCfg.ConnString = fmt.Sprintf("server=%s; user id=%s; password=%s; port=%d; database=%s;encrypt=disable", dbCfg.DBHost, dbCfg.DBUser, dbCfg.DBPassword, dbCfg.DBPort, dbCfg.Database)
+	case "oracle":
+		//dsn := "user:password@tcp(host:port)/dbname"
+		dbCfg.ConnString = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbCfg.DBUser, dbCfg.DBPassword, dbCfg.DBHost, dbCfg.DBPort, dbCfg.Database)
 	default:
 		return nil, errors.New("暂不支持该数据库类型 DBType: " + dbCfg.DBType)
 	}
