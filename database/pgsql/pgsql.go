@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// GormPGSql 初始化GormPGSql数据库。
+// GormPGSql 初始化数据库。
 // 参数PasswordDecryptionKey密码解密密钥,密钥为空时表示配置文件中的密码是明文.
 // 密码加密是用 encrypt.TripleDesDecrypt 进行加密的
 // 需要用一个ini类型的配置文件: dbconn.cfg

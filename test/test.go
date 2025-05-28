@@ -11,9 +11,6 @@ import (
 )
 
 func main() {
-	//MySQLTest()
-	//SQLiteTest()
-
 	dbcfg, err := database.ReadDBConfig("DATABASE", "")
 	if err != nil {
 		fmt.Println("读取配置失败!", err)

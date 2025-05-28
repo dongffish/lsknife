@@ -4,7 +4,6 @@ import (
 	"errors"
 	"gitee.com/dongffish/lsknife/database"
 	oracle "github.com/seelly/gorm-oracle"
-	//oracle "github.com/go-gorm/gorm-oracle"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"log"
@@ -72,7 +71,7 @@ func GormOracle(iniSection, PasswordDecryptionKey string) (*gorm.DB, error) {
 	return db, err
 }
 
-// GormOracleByDSN 根据DSN初始化Mysql数据库
+// GormOracleByDSN 根据DSN初始化数据库
 func GormOracleByDSN(dsn string) (*gorm.DB, error) {
 	var gormCfg gorm.Config
 	db, err := gorm.Open(oracle.New(oracle.Config{
