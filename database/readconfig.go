@@ -6,6 +6,7 @@ import (
 	"gitee.com/dongffish/lsknife/lsencrypt"
 	"gitee.com/dongffish/lsknife/lslog"
 	"github.com/go-ini/ini"
+	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 )
@@ -29,6 +30,75 @@ type DBConfig struct {
 }
 
 func ReadDBConfig(dbSection, PasswordDecryptionKey string) (*DBConfig, error) {
+	var err error
+	// 获取可执行文件所在目录绝对路径
+	exeDir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		return nil, fmt.Errorf("获取执行目录失败: %v", err)
+	}
+	// 设置Viper配置
+	viper.SetConfigName("config") // 配置文件名（不带扩展名）
+	viper.SetConfigType("toml")   // 配置文件类型
+	// viper.AddConfigPath(".")      // 在目录查找配置文件
+	viper.AddConfigPath(exeDir) // 在目录查找配置文件
+
+	// 读取配置文件
+	if err := viper.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("error reading config file: %v", err)
+	}
+	// 读取特定配置项
+	dbCfg := &DBConfig{
+		MaxOpenConns:    100, //用于设置最大打开的连接数，值为0表示不限制
+		MaxIdleConns:    100, //用于设置闲置的连接数,建议MaxOpenConns的值等于MaxIdleConns
+		ConnMaxLifetime: 100, //通过SetConnMaxLifetime来关闭空闲连接 (秒).给db设置一个超时时间，时间小于数据库的超时时间即可
+	}
+
+	dbCfg.HostIP = viper.GetString("SYSTEM.HostIP")
+	dbCfg.DBType = viper.GetString(dbSection + ".DBType")
+	dbCfg.Charset = viper.GetString(dbSection + ".Charset")
+	dbCfg.DBHost = viper.GetString(dbSection + ".DBHost")
+	dbCfg.DBPort = viper.GetInt(dbSection + ".DBPort")
+	dbCfg.DBUser = viper.GetString(dbSection + ".DBUser")
+	dbCfg.DBPassword = viper.GetString(dbSection + ".DBPassword")
+	dbCfg.ShowSQL = viper.GetInt(dbSection + ".ShowSQL") // ShowSQL 隐藏的配置参数,默认0，即不显示SQL语句
+	dbCfg.Database = viper.GetString(dbSection + ".Database")
+	dbCfg.MaxOpenConns = viper.GetInt(dbSection + ".MaxOpenConns")
+	dbCfg.MaxIdleConns = viper.GetInt(dbSection + ".MaxIdleConns")
+	dbCfg.ConnMaxLifetime = viper.GetInt(dbSection + ".ConnMaxLifetime")
+	if dbCfg.MaxOpenConns == 0 {
+		dbCfg.MaxOpenConns = 100
+	}
+	if dbCfg.MaxIdleConns == 0 {
+		dbCfg.MaxIdleConns = 100
+	}
+	if dbCfg.ConnMaxLifetime == 0 {
+		dbCfg.ConnMaxLifetime = 100
+	}
+	if PasswordDecryptionKey != "" {
+		var b []byte
+		if b, err = lsencrypt.TripleDesDecrypt([]byte(dbCfg.DBPassword), []byte(PasswordDecryptionKey)); err != nil {
+			lslog.Logger.Errorln(lslog.GetLogPrefix(), "密码转换异常！")
+			return nil, err
+		}
+		dbCfg.DBPassword = string(b)
+	}
+
+	switch dbCfg.DBType {
+	case "mysql":
+		dbCfg.ConnString = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=Local", dbCfg.DBUser, dbCfg.DBPassword, dbCfg.DBHost, dbCfg.DBPort, dbCfg.Database, dbCfg.Charset)
+	case "pgsql":
+		dbCfg.ConnString = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", dbCfg.DBHost, dbCfg.DBUser, dbCfg.DBPassword, dbCfg.Database, dbCfg.DBPort)
+	case "mssql":
+		dbCfg.ConnString = fmt.Sprintf("server=%s; user id=%s; password=%s; port=%d; database=%s;encrypt=disable", dbCfg.DBHost, dbCfg.DBUser, dbCfg.DBPassword, dbCfg.DBPort, dbCfg.Database)
+	case "oracle":
+		dbCfg.ConnString = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbCfg.DBUser, dbCfg.DBPassword, dbCfg.DBHost, dbCfg.DBPort, dbCfg.Database)
+	default:
+		return nil, errors.New("暂不支持该数据库类型 DBType: " + dbCfg.DBType)
+	}
+	return dbCfg, nil
+}
+
+func ReadDBIniConfig(dbSection, PasswordDecryptionKey string) (*DBConfig, error) {
 	var err error
 	// 获取可执行文件所在目录绝对路径
 	exeDir, err := filepath.Abs(filepath.Dir(os.Args[0]))

@@ -14,30 +14,38 @@ import (
 // GormPGSql 初始化数据库。
 // 参数PasswordDecryptionKey密码解密密钥,密钥为空时表示配置文件中的密码是明文.
 // 密码加密是用 encrypt.TripleDesDecrypt 进行加密的
-// 需要用一个ini类型的配置文件: dbconn.cfg
+// 需要用一个toml类型的配置文件: config.toml
 func GormPGSql(iniSection, PasswordDecryptionKey string) (*gorm.DB, error) {
 	if iniSection == "" {
 		iniSection = "DATABASE"
 	}
 	dbCfg, err := database.ReadDBConfig(iniSection, PasswordDecryptionKey)
 	if err != nil {
-		return nil, errors.New("数据库配置文件 dbconn.cfg 读取失败!" + err.Error())
+		return nil, errors.New("数据库配置文件config.toml读取失败!" + err.Error())
 	}
 
 	var gormCfg gorm.Config
+	var customLogger logger.Interface
 	gormCfg.DisableForeignKeyConstraintWhenMigrating = true
 
-	// 配置 logger，忽略 record not found 错误
-	customLogger := logger.New(
-		log.New(os.Stdout, "\r\n", log.LstdFlags),
-		logger.Config{
-			IgnoreRecordNotFoundError: true, // 忽略 record not found 错误
-		},
-	)
-	if dbCfg.ShowSQL == 1 {
-		customLogger.LogMode(logger.Info) // 打印 SQL 语句
+	// fmt.Println("dbCfg.ShowSQL =", dbCfg.ShowSQL)
+	if dbCfg.ShowSQL == 1 { //显示所有SQL
+		customLogger = logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				IgnoreRecordNotFoundError: true, // 忽略 record not found 错误
+				LogLevel:                  logger.Info,
+			},
+		)
 	} else {
-		customLogger.LogMode(logger.Error) // 只打印错误
+		customLogger = logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				IgnoreRecordNotFoundError: true, // 忽略 record not found 错误
+				LogLevel:                  logger.Error,
+			},
+
+		)
 	}
 	gormCfg.Logger = customLogger
 

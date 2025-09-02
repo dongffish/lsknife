@@ -1,0 +1,53 @@
+#================================================================================#
+# 功能: 配置文件 ( config.toml )
+# 说明: 这是一个配置参数模板。使用用时将复制为一个 config.toml文件，并配置相应的参数
+#===============================================================================#
+#数据库配置,必须配置3段,分别是[DATABASE]表示主数据库、[SYSLOG_DATABASE]表示syslog数据库，[FLOW_DATABASE]流数据库(IP流量)
+# 这3个数据库可以在同一台服务器上，也可以在不同服务器上，也可以是不同的数据库类型。
+# 系统配置
+[SYSTEM]
+HostIP = "172.25.255.234"  #本机实际使用的有线物理网卡IP地址
+
+# 数据库配置
+[DATABASE]
+DBType = "mysql"  # 支持 mysql、mssql、pgsql、oracle
+DBHost = "127.0.0.1"  # 数据库服务器地址
+DBPort = 4040  # 数据库端口
+DBUser = "lsnms"  # 数据库用户名
+#DBPassword: 数据库密码。密码和调用它的功能函数有关，如mysql.GormMysql("DATABASE", PasswordDecryptionKey),当PasswordDecryptionKey=""时，即调用时没有指定密钥，则这里的密码表示明文。否则是加密后的密文。
+#如果是密文，请调用lsencrypt.TripleDesEncrypt 进行加密
+DBPassword = "iV/TtpPiw2pMTiAtT7v14Q=="  # 数据库密码(加密),请用lsassisthelp -H 密码明文 -T E 生成
+Database = "smartnms"  # 数据库名
+Charset = "utf8mb4"  # 数据库编码
+MaxOpenConns = 300  # MaxOpenConns用于设置最大打开的连接数，值为0表示不限制
+MaxIdleConns = 300  # MaxIdleConns用于设置闲置的连接数,建议MaxOpenConns的值等于MaxIdleConns
+ConnMaxLifetime = 150  # 建议通过SetConnMaxLifetime来关闭空闲连接 (秒).给db设置一个超时时间，时间小于数据库的超时时间即可
+ShowSQL = 1   #执行时是否会显示SQL语句，1-是 0-否(默认)。建议只在开发调试时设为1.
+
+#SYSLOG数据库类型
+[SYSLOG_DATABASE]
+DBType = "mysql"  # 支持 mysql、mssql、pgsql，默认mysql
+DBHost = "127.0.0.1"  # 数据库服务器地址
+DBPort = 4040  # 数据库端口
+DBUser = "lsnms"  # 数据库用户名
+DBPassword = "iV/TtpPiw2pMTiAtT7v14Q=="  # 数据库密码(加密),请用lsassisthelp -H 密码明文 -T E 生成
+Database = "smartsyslog"  # 数据库名
+Charset = "utf8mb4"  # 数据库编码
+MaxOpenConns = 300  # MaxOpenConns用于设置最大打开的连接数，值为0表示不限制
+MaxIdleConns = 300  # MaxIdleConns用于设置闲置的连接数,建议MaxOpenConns的值等于MaxIdleConns
+ConnMaxLifetime = 150  # 建议通过SetConnMaxLifetime来关闭空闲连接 (秒).给db设置一个超时时间，时间小于数据库的超时时间即可
+ShowSQL = 0   # 是否显示执行的SQL 0-否(默认) 1-是
+
+#FLOW数据库类型
+[FLOW_DATABASE]
+DBType = "mysql"  # 支持 mysql、mssql、pgsql，默认mysql
+DBHost = "127.0.0.1"  # 数据库服务器地址
+DBPort = 4040  # 数据库端口
+DBUser = "lsnms"  # 数据库用户名
+DBPassword = "iV/TtpPiw2pMTiAtT7v14Q=="  # 数据库密码(加密),请用lsassisthelp -H 密码明文 -T E 生成
+Database = "smartsflow"  # 数据库名
+Charset = "utf8mb4"  # 数据库编码
+MaxOpenConns = 300  # MaxOpenConns用于设置最大打开的连接数，值为0表示不限制
+MaxIdleConns = 300  # MaxIdleConns用于设置闲置的连接数,建议MaxOpenConns的值等于MaxIdleConns
+ConnMaxLifetime = 150  # 建议通过SetConnMaxLifetime来关闭空闲连接 (秒).给db设置一个超时时间，时间小于数据库的超时时间即可
+ShowSQL = 0   # 是否显示执行的SQL 0-不 1-是

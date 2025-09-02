@@ -8,14 +8,18 @@ import (
 	"gitee.com/dongffish/lsknife/database/pgsql"
 	"gitee.com/dongffish/lsknife/database/sqlite"
 	"gitee.com/dongffish/lsknife/lslog"
+	"gitee.com/dongffish/lsknife/test/models"
 )
 
+var PasswordKeyDefault = "YyHz*sH_Yh!Hxy#528866838@qq.com;$China"
+
 func main() {
-	dbcfg, err := database.ReadDBConfig("DATABASE", "")
+	dbcfg, err := database.ReadDBConfig("DATABASE", PasswordKeyDefault)
 	if err != nil {
-		fmt.Println("读取配置失败!", err)
+		fmt.Println(err)
 		return
 	}
+	fmt.Println("ShowSQL =", dbcfg.ShowSQL)
 	if dbcfg.DBType == "mysql" {
 		MySQLTest()
 	}
@@ -32,12 +36,19 @@ func main() {
 
 func MySQLTest() {
 	lslog.Logger.Infoln(lslog.GetLogPrefix(), "Hello MYSql !")
-	db, err := mysql.GormMysql("DATABASE", "")
+	db, err := mysql.GormMysql("DATABASE", PasswordKeyDefault)
 	if err != nil {
 		lslog.Logger.Errorln(err)
 		return
 	}
 	fmt.Println("db open success !", db)
+	var tb []models.Linkseeusers
+
+	db.Model(&models.Linkseeusers{}).Find(&tb)
+	for _, v := range tb {
+		fmt.Println(v)
+	}
+
 	defer func() {
 		db1, _ := db.DB() // 程序结束前关闭数据库链接
 		_ = db1.Close()
@@ -47,7 +58,7 @@ func MySQLTest() {
 }
 func OracleTest() {
 	lslog.Logger.Infoln(lslog.GetLogPrefix(), "Hello Oracle Database !")
-	db, err := mysql.GormMysql("DATABASE", "")
+	db, err := mysql.GormMysql("DATABASE", PasswordKeyDefault)
 	if err != nil {
 		lslog.Logger.Errorln(err)
 		return
@@ -63,7 +74,7 @@ func OracleTest() {
 
 func MssqlTest() {
 	lslog.Logger.Infoln(lslog.GetLogPrefix(), "Hello MicroSoft SQL Server !")
-	db, err := mssql.GormMssql("DATABASE", "")
+	db, err := mssql.GormMssql("DATABASE", PasswordKeyDefault)
 	if err != nil {
 		lslog.Logger.Errorln(err)
 		return
@@ -116,7 +127,7 @@ func SQLiteTest() {
 func PGSQLTest() {
 	lslog.Logger.Infoln(lslog.GetLogPrefix(), "Hello PQSQL!")
 
-	db, err := pgsql.GormPGSql("DATABASE", "")
+	db, err := pgsql.GormPGSql("DATABASE", PasswordKeyDefault)
 	if err != nil {
 		lslog.Logger.Errorln(err)
 		return
