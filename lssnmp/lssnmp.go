@@ -32,6 +32,11 @@ func (s *Snmp) init() {
 
 // Get to get a SNMP value by oid string
 func (s *Snmp) Get(oid string) (string, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered", r)
+		}
+	}()
 	sOid, err := wapsnmp.ParseOid(oid)
 	if err != nil {
 		//lslog.Logger.Debugf("%s snmpget -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
@@ -67,6 +72,11 @@ func (s *Snmp) Get(oid string) (string, error) {
 
 // GetMultiple to get SNMP values by oid slice
 func (s *Snmp) GetMultiple(oids []string) (map[string]string, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in GetMultiple", r)
+		}
+	}()
 	version := wapsnmp.SNMPv2c
 	switch strings.ToLower(s.Version) {
 	case "1", "v1", "snmpv1":
@@ -120,6 +130,11 @@ func (s SortedWalkSlice) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 func (s SortedWalkSlice) Less(i, j int) bool {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered Less", r)
+		}
+	}()
 	v1 := strings.Split(s[i].Oid, ".")
 	v2 := strings.Split(s[j].Oid, ".")
 	if len(v1) != len(v2) {
@@ -218,6 +233,11 @@ func (s *Snmp) Walk(oid string) (map[string]string, error) {
 
 // Set use wapsnmp to do snmp set
 func (s *Snmp) Set(oid string, value interface{}) (interface{}, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered set(oid)", oid)
+		}
+	}()
 	version := wapsnmp.SNMPv2c
 	switch strings.ToLower(s.Version) {
 	case "1", "v1", "snmpv1":
@@ -249,6 +269,11 @@ func (s *Snmp) Set(oid string, value interface{}) (interface{}, error) {
 	ret, err := MultiSet1(toset)
 */
 func (s *Snmp) MultiSet(toset map[string]interface{}) (map[string]interface{}, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered MultiSet", r)
+		}
+	}()
 	version := wapsnmp.SNMPv2c
 	switch strings.ToLower(s.Version) {
 	case "1", "v1", "snmpv1":
