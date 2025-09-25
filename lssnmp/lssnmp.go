@@ -57,17 +57,6 @@ func (s *Snmp) Get(oid string) (string, error) {
 		//lslog.Logger.Debugf("%s snmpget -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
 		return "", err
 	}
-	/*
-		tp := reflect.TypeOf(sSnmpValue)
-		Logger.Infoln(oid, "返回类型：", tp.Kind(), "数据:", fmt.Sprintf("%v", sSnmpValue))
-			switch tp.Kind() {
-			case reflect.String:
-				//
-			case reflect.Slice:
-				//
-				//case reflect.
-			}
-	*/
 	value := strings.Trim(fmt.Sprintf("%v", sSnmpValue), ".")
 	if value == "[128 0]" { // [128 0]
 		//lslog.Logger.Debugf("%s snmpget -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
@@ -149,6 +138,11 @@ func (s SortedWalkSlice) Less(i, j int) bool {
 
 // SortWalk snmp walk function return with a sorted result slice
 func (s *Snmp) SortWalk(oid string) (SortedWalkSlice, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in SortWalk(oid)", oid)
+		}
+	}()
 	version := wapsnmp.SNMPv2c
 	switch strings.ToLower(s.Version) {
 	case "1", "v1", "snmpv1":
@@ -185,6 +179,11 @@ func (s *Snmp) SortWalk(oid string) (SortedWalkSlice, error) {
 
 // Walk to get do snmp walk
 func (s *Snmp) Walk(oid string) (map[string]string, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in Walk(oid)", oid)
+		}
+	}()
 	version := wapsnmp.SNMPv2c
 	switch strings.ToLower(s.Version) {
 	case "1", "v1", "snmpv1":
