@@ -22,6 +22,33 @@ import (
 	"github.com/xormplus/core"
 )
 
+func logInit() {
+	// 检查log目录是否存在，不存在则新建一个
+	if ok, _ := pathExists("log"); !ok {
+		_ = os.Mkdir("log", 0777)
+	}
+	cfgText := `[LOG]
+#LogLevel日志级别： DEBUG,INFO
+LogLevel=INFO
+LogTarget=FILE`
+	// 检查log.cfg是否存在，不存在则新建一个
+	if ok, _ := pathExists("log.cfg"); !ok {
+		_ = os.WriteFile("log.cfg", []byte(cfgText), 0777)
+	}
+}
+
+// 判断文件/目录是否存在
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
 // GetCurrentExecutePath 获取当时运行程序的目录 get current exe path
 func getCurrentExecutePath() (string, error) {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
