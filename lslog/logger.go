@@ -22,7 +22,7 @@ import (
 	"github.com/xormplus/core"
 )
 
-func logInit() {
+func LogInit() {
 	// 检查log目录是否存在，不存在则新建一个
 	if ok, _ := pathExists("log"); !ok {
 		_ = os.Mkdir("log", 0777)
@@ -204,6 +204,7 @@ func setNull() {
 
 // New create a new instance of logger
 func init() {
+	LogInit()
 	level := "INFO"
 	logFileName := ""
 	logFormat := "2006/01/02 15:04:05"
