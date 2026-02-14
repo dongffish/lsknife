@@ -1,13 +1,13 @@
 module gitee.com/dongffish/lsknife
 
-go 1.23.2
+go 1.24.0
 
 require (
 	github.com/axgle/mahonia v0.0.0-20180208002826-3358181d7394
-	github.com/cdevr/WapSNMP v0.1.0
 	github.com/duke-git/lancet/v2 v2.3.4
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-ini/ini v1.67.0
+	github.com/gosnmp/gosnmp v1.43.2
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/petermattis/goid v0.0.0-20250211185408-f2b9d978cd7a
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
@@ -69,7 +69,7 @@ require (
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.22.5 // indirect

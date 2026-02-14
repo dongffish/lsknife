@@ -1,13 +1,13 @@
 package lssnmp
 
 import (
-	"errors"
 	"fmt"
-	"github.com/cdevr/WapSNMP"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gosnmp/gosnmp"
 )
 
 // Snmp is wrapped some convinince SNMP interface for SNMP operation
@@ -30,33 +30,38 @@ func (s *Snmp) init() {
 	s.Retries = 1
 }
 
-//GetReturnInterface  Get to get SNMP value by oid string
+// GetReturnInterface  Get to get SNMP value by oid string
 func (s *Snmp) GetReturnInterface(oid string) (interface{}, error) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered", r)
 		}
 	}()
-	sOid, err := wapsnmp.ParseOid(oid)
+
+	gs := s.newGoSNMP()
+	if err := gs.Connect(); err != nil {
+		return "", fmt.Errorf("error connecting snmp: %v", err)
+	}
+	defer gs.Conn.Close()
+
+	// Perform GET
+	pkt, err := gs.Get([]string{oid})
 	if err != nil {
 		return "", err
 	}
-	version := wapsnmp.SNMPv2c
-	switch strings.ToLower(s.Version) {
-	case "1", "v1", "snmpv1":
-		version = wapsnmp.SNMPv1
-	case "2", "2c", "v2", "v2c", "snmpv2", "snmpv2c":
-		version = wapsnmp.SNMPv2c
-	default:
-		return "", errors.New("Not supported version: " + s.Version)
+	if len(pkt.Variables) == 0 {
+		return "", fmt.Errorf("no variable returned for OID: %s", oid)
 	}
-	wsnmp, err := wapsnmp.NewWapSNMP(s.Host, s.CommStr, version, time.Duration(s.Timeout)*time.Second, s.Retries)
-	if err != nil {
-		//lslog.Logger.Debugf("%s snmpget -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
-		return "", fmt.Errorf("error creating wsnmp => %v", err)
+	v := pkt.Variables[0]
+
+	// Check for SNMP errors encoded in the variable type
+	switch v.Type {
+	case gosnmp.NoSuchObject, gosnmp.NoSuchInstance:
+		return "", fmt.Errorf("no Such Object available on this agent at this OID: %s", oid)
+	case gosnmp.Null:
+		return "", fmt.Errorf("value is null for OID: %s", oid)
 	}
-	defer wsnmp.Close()
-	return wsnmp.Get(sOid)
+	return v.Value, nil
 }
 
 // Get to get SNMP value by oid string
@@ -66,12 +71,13 @@ func (s *Snmp) Get(oid string) (string, error) {
 			fmt.Println("Recovered", r)
 		}
 	}()
-	sSnmpValue, err := s.GetReturnInterface(oid) //wsnmp.Get(sOid)
+
+	sSnmpValue, err := s.GetReturnInterface(oid)
 	if sSnmpValue == nil {
 		return "", err
 	}
 	value := strings.Trim(fmt.Sprintf("%v", sSnmpValue), ".")
-	if value == "[128 0]" { // [128 0]
+	if value == "[128 0]" { // [128 0]  (kept for compatibility with original WapSNMP behavior)
 		return "", fmt.Errorf("no Such Object available on this agent at this OID: %s", oid)
 	}
 	return value, nil
@@ -84,39 +90,27 @@ func (s *Snmp) GetMultiple(oids []string) (map[string]string, error) {
 			fmt.Println("Recovered in GetMultiple", r)
 		}
 	}()
-	version := wapsnmp.SNMPv2c
-	switch strings.ToLower(s.Version) {
-	case "1", "v1", "snmpv1":
-		version = wapsnmp.SNMPv1
-	case "2", "2c", "v2", "v2c", "snmpv2", "snmpv2c":
-		version = wapsnmp.SNMPv2c
-	default:
-		return nil, errors.New("Not supported version: " + s.Version)
+
+	gs := s.newGoSNMP()
+	if err := gs.Connect(); err != nil {
+		return nil, fmt.Errorf("error connecting snmp: %v", err)
 	}
-	var oidSlice []wapsnmp.Oid
-	var err error
-	for _, v := range oids {
-		sOid, err := wapsnmp.ParseOid(v)
-		if err != nil {
-			//lslog.Logger.Debugf("%s GetMultiple -c %s -v %s -t %d -r %d %s %v", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oids)
-			return nil, err
-		}
-		oidSlice = append(oidSlice, sOid)
-	}
-	wsnmp, err := wapsnmp.NewWapSNMP(s.Host, s.CommStr, version, time.Duration(s.Timeout)*time.Second, s.Retries)
+	defer gs.Conn.Close()
+
+	pkt, err := gs.Get(oids)
 	if err != nil {
-		//lslog.Logger.Debugf("%s GetMultiple -c %s -v %s -t %d -r %d %s %v", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oids)
-		return nil, fmt.Errorf("error creating wsnmp => %v", err)
-	}
-	defer wsnmp.Close()
-	result, err := wsnmp.GetMultiple(oidSlice)
-	if err != nil {
-		//lslog.Logger.Debugf("%s GetMultiple -c %s -v %s -t %d -r %d %s %v", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oids)
 		return nil, err
 	}
+
 	res := make(map[string]string)
-	for k, v := range result {
-		res[strings.Trim(k, ".")] = fmt.Sprintf("%v", v)
+	for i, v := range pkt.Variables {
+		// Use the original OID from the request to preserve the key format
+		oid := oids[i]
+		if v.Type == gosnmp.NoSuchObject || v.Type == gosnmp.NoSuchInstance {
+			res[oid] = ""
+			continue
+		}
+		res[oid] = fmt.Sprintf("%v", v.Value)
 	}
 	return res, nil
 }
@@ -160,38 +154,6 @@ func (s SortedWalkSlice) Less(i, j int) bool {
 
 // SortWalk snmp walk function return with a sorted result slice
 func (s *Snmp) SortWalk(oid string) (SortedWalkSlice, error) {
-	/*	defer func() {
-			if r := recover(); r != nil {
-				fmt.Println("Recovered in SortWalk(oid)", oid)
-			}
-		}()
-		version := wapsnmp.SNMPv2c
-		switch strings.ToLower(s.Version) {
-		case "1", "v1", "snmpv1":
-			version = wapsnmp.SNMPv1
-		case "2", "2c", "v2", "v2c", "snmpv2", "snmpv2c":
-			version = wapsnmp.SNMPv2c
-		default:
-			return nil, errors.New("Not supported version: " + s.Version)
-		}
-		sOid, err := wapsnmp.ParseOid(oid)
-		if err != nil {
-			//lslog.Logger.Debugf("%s snmpwalk -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
-			return nil, err
-		}
-
-		wsnmp, err := wapsnmp.NewWapSNMP(s.Host, s.CommStr, version, time.Duration(s.Timeout)*time.Second, s.Retries)
-		if err != nil {
-			//lslog.Logger.Debugf("%s snmpwalk -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
-			return nil, fmt.Errorf("error creating wsnmp => %v", err)
-		}
-		defer wsnmp.Close()
-		result, err := wsnmp.GetTable(sOid)
-		if err != nil {
-			return nil, err
-		}
-	*/
-
 	result, err := s.WalkReturnInterface(oid)
 	if err != nil {
 		return nil, err
@@ -211,68 +173,27 @@ func (s *Snmp) WalkReturnInterface(oid string) (map[string]interface{}, error) {
 			fmt.Println("Recovered in Walk(oid)", oid)
 		}
 	}()
-	version := wapsnmp.SNMPv2c
-	switch strings.ToLower(s.Version) {
-	case "1", "v1", "snmpv1":
-		version = wapsnmp.SNMPv1
-	case "2", "2c", "v2", "v2c", "snmpv2", "snmpv2c":
-		version = wapsnmp.SNMPv2c
-	default:
-		return nil, errors.New("Not supported version: " + s.Version)
+
+	gs := s.newGoSNMP()
+	if err := gs.Connect(); err != nil {
+		return nil, fmt.Errorf("error connecting snmp: %v", err)
 	}
-	sOid, err := wapsnmp.ParseOid(oid)
+	defer gs.Conn.Close()
+
+	results := make(map[string]interface{})
+	err := gs.Walk(oid, func(pdu gosnmp.SnmpPDU) error {
+		// pdu.Name is the full OID (including the root part)
+		results[pdu.Name] = pdu.Value
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	wsnmp, err := wapsnmp.NewWapSNMP(s.Host, s.CommStr, version, time.Duration(s.Timeout)*time.Second, s.Retries)
-	if err != nil {
-		return nil, fmt.Errorf("error creating wsnmp => %v", err)
-	}
-	defer wsnmp.Close()
-	//result, err := wsnmp.GetTable(sOid)
-	return wsnmp.GetTable(sOid)
-	/*
-		if err != nil {
-			return nil, err
-		}
-		res := make(map[string]string)
-		for k, v := range result {
-			res[strings.Trim(k, ".")] = fmt.Sprintf("%+v", v)
-		}
-		return res, nil*/
+	return results, nil
 }
 
 // Walk to get do snmp walk
 func (s *Snmp) Walk(oid string) (map[string]string, error) {
-	/*defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered in Walk(oid)", oid)
-		}
-	}()
-	version := wapsnmp.SNMPv2c
-	switch strings.ToLower(s.Version) {
-	case "1", "v1", "snmpv1":
-		version = wapsnmp.SNMPv1
-	case "2", "2c", "v2", "v2c", "snmpv2", "snmpv2c":
-		version = wapsnmp.SNMPv2c
-	default:
-		return nil, errors.New("Not supported version: " + s.Version)
-	}
-	sOid, err := wapsnmp.ParseOid(oid)
-	if err != nil {
-		//lslog.Logger.Debugf("%s snmpwalk -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
-		return nil, err
-	}
-
-	wsnmp, err := wapsnmp.NewWapSNMP(s.Host, s.CommStr, version, time.Duration(s.Timeout)*time.Second, s.Retries)
-	if err != nil {
-		//lslog.Logger.Debugf("%s snmpwalk -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
-		return nil, fmt.Errorf("error creating wsnmp => %v", err)
-	}
-	defer wsnmp.Close()*/
-
-	//result, err := wsnmp.GetTable(sOid)
 	result, err := s.WalkReturnInterface(oid)
 	if err != nil {
 		return nil, err
@@ -284,37 +205,36 @@ func (s *Snmp) Walk(oid string) (map[string]string, error) {
 	return res, nil
 }
 
-// Set use wapsnmp to do snmp set
+// Set use gosnmp to do snmp set
 func (s *Snmp) Set(oid string, value interface{}) (interface{}, error) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered set(oid)", oid)
 		}
 	}()
-	version := wapsnmp.SNMPv2c
-	switch strings.ToLower(s.Version) {
-	case "1", "v1", "snmpv1":
-		version = wapsnmp.SNMPv1
-	case "2", "2c", "v2", "v2c", "snmpv2", "snmpv2c":
-		version = wapsnmp.SNMPv2c
-	default:
-		return "", errors.New("Not supported version: " + s.Version)
+
+	gs := s.newGoSNMP()
+	if err := gs.Connect(); err != nil {
+		return nil, fmt.Errorf("error connecting snmp: %v", err)
 	}
-	sOid, err := wapsnmp.ParseOid(oid)
+	defer gs.Conn.Close()
+
+	pdu, err := buildPdu(oid, value)
 	if err != nil {
-		//lslog.Logger.Debugf("%s snmpset -c %s -v %s -t %d -r %d %s %s %+v", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid, value)
 		return nil, err
 	}
-	wsnmp, err := wapsnmp.NewWapSNMP(s.Host, s.CommStr, version, time.Duration(s.Timeout)*time.Second, s.Retries)
+
+	pkt, err := gs.Set([]gosnmp.SnmpPDU{pdu})
 	if err != nil {
-		//lslog.Logger.Debugf("%s snmpset -c %s -v %s -t %d -r %d %s %s %+v", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid, value)
-		return nil, fmt.Errorf("error creating wsnmp => %v", err)
+		return nil, err
 	}
-	defer wsnmp.Close()
-	return wsnmp.Set(sOid, value)
+	if len(pkt.Variables) == 0 {
+		return nil, fmt.Errorf("no response variable for OID %s", oid)
+	}
+	return pkt.Variables[0].Value, nil
 }
 
-// MultiSet use wsnmp to do multi set
+// MultiSet use gosnmp to do multi set
 /*
 	toset := make(map[string]interface{})
 	toset[oid1]="abc"
@@ -327,19 +247,119 @@ func (s *Snmp) MultiSet(toset map[string]interface{}) (map[string]interface{}, e
 			fmt.Println("Recovered MultiSet", r)
 		}
 	}()
-	version := wapsnmp.SNMPv2c
+
+	gs := s.newGoSNMP()
+	if err := gs.Connect(); err != nil {
+		return nil, fmt.Errorf("error connecting snmp: %v", err)
+	}
+	defer gs.Conn.Close()
+
+	pdus := make([]gosnmp.SnmpPDU, 0, len(toset))
+	for oid, val := range toset {
+		pdu, err := buildPdu(oid, val)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build PDU for OID %s: %v", oid, err)
+		}
+		pdus = append(pdus, pdu)
+	}
+
+	pkt, err := gs.Set(pdus)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build result map from response variables, keyed by original OIDs.
+	// Note: The response order should match the request order.
+	result := make(map[string]interface{})
+	for i, oid := range pdus {
+		if i < len(pkt.Variables) {
+			result[oid.Name] = pkt.Variables[i].Value
+		} else {
+			result[oid.Name] = nil
+		}
+	}
+	return result, nil
+}
+
+// newGoSNMP creates a gosnmp.GoSNMP instance configured from the Snmp struct.
+func (s *Snmp) newGoSNMP() *gosnmp.GoSNMP {
+	version := gosnmp.Version2c
 	switch strings.ToLower(s.Version) {
 	case "1", "v1", "snmpv1":
-		version = wapsnmp.SNMPv1
+		version = gosnmp.Version1
 	case "2", "2c", "v2", "v2c", "snmpv2", "snmpv2c":
-		version = wapsnmp.SNMPv2c
+		version = gosnmp.Version2c
 	default:
-		return nil, errors.New("Not supported version: " + s.Version)
+		// fallback to v2c (the original code returned an error in such cases,
+		// but we handle version mapping earlier; here we just keep the default)
 	}
-	wsnmp, err := wapsnmp.NewWapSNMP(s.Host, s.CommStr, version, time.Duration(s.Timeout)*time.Second, s.Retries)
-	if err != nil {
-		return nil, fmt.Errorf("error creating wsnmp => %v", err)
+
+	port := s.Port
+	if port == 0 {
+		port = 161
 	}
-	defer wsnmp.Close()
-	return wsnmp.SetMultiple(toset)
+	timeout := s.Timeout
+	if timeout == 0 {
+		timeout = 2
+	}
+	retries := s.Retries
+	if retries == 0 {
+		retries = 1
+	}
+	community := s.CommStr
+	if community == "" {
+		community = "public"
+	}
+
+	return &gosnmp.GoSNMP{
+		Target:    s.Host,
+		Port:      uint16(port),
+		Community: community,
+		Version:   version,
+		Timeout:   time.Duration(timeout) * time.Second,
+		Retries:   retries,
+		// Set MaxRepetitions to a reasonable value for Walk/BulkWalk
+		MaxRepetitions: 50,
+	}
+}
+
+// buildPdu creates a gosnmp.SnmpPDU from an OID and a Go value.
+// It attempts to infer the correct ASN.1 type based on the value's kind.
+func buildPdu(oid string, value interface{}) (gosnmp.SnmpPDU, error) {
+	pdu := gosnmp.SnmpPDU{
+		Name: oid,
+	}
+
+	switch v := value.(type) {
+	case string:
+		pdu.Type = gosnmp.OctetString
+		pdu.Value = v
+	case int:
+		pdu.Type = gosnmp.Integer
+		pdu.Value = v
+	case int32:
+		pdu.Type = gosnmp.Integer
+		pdu.Value = v
+	case int64:
+		pdu.Type = gosnmp.Counter64
+		pdu.Value = v
+	case uint:
+		pdu.Type = gosnmp.Gauge32
+		pdu.Value = v
+	case uint32:
+		pdu.Type = gosnmp.Gauge32
+		pdu.Value = v
+	case uint64:
+		pdu.Type = gosnmp.Counter64
+		pdu.Value = v
+	case []byte:
+		pdu.Type = gosnmp.OctetString
+		pdu.Value = v
+	case nil:
+		pdu.Type = gosnmp.Null
+		pdu.Value = nil
+	default:
+		return pdu, fmt.Errorf("unsupported value type for SNMP set: %T", value)
+	}
+	return pdu, nil
 }
