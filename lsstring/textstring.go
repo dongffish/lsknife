@@ -1,6 +1,8 @@
 package lsstring
 
 import (
+	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -72,4 +74,28 @@ func FirstToLower(s string) string {
 		return ""
 	}
 	return strings.ToLower(s[:1]) + s[1:]
+}
+
+func InterfaceToString(v interface{}) (string, error) {
+	// 使用 type switch 判断 b 的实际类型
+	switch v := v.(type) {
+	case nil:
+		return "", errors.New("返回值为 nil")
+	case string:
+		return fmt.Sprintf("%s", v), nil
+	case []byte:
+		return string(v), nil
+	case int:
+		return fmt.Sprintf("%d", v), nil
+	case int64:
+		return fmt.Sprintf("%d", v), nil
+	case float64:
+		fmt.Printf("类型是 float64: %.2f\n", v)
+	case bool:
+		return fmt.Sprintf("%t", v), nil
+	case []interface{}:
+		//fmt.Printf("类型是 []interface{}: %v\n", v)
+		return fmt.Sprintf("%v", v), nil
+	}
+	return fmt.Sprintf("%v", v), errors.New(fmt.Sprintf("未知数据类型 %T", v))
 }

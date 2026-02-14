@@ -1,6 +1,7 @@
 package lssnmp
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -76,11 +77,38 @@ func (s *Snmp) Get(oid string) (string, error) {
 	if sSnmpValue == nil {
 		return "", err
 	}
-	value := strings.Trim(fmt.Sprintf("%v", sSnmpValue), ".")
-	if value == "[128 0]" { // [128 0]  (kept for compatibility with original WapSNMP behavior)
-		return "", fmt.Errorf("no Such Object available on this agent at this OID: %s", oid)
+	return interfaceToString(sSnmpValue)
+
+	/*
+		value := strings.Trim(fmt.Sprintf("%v", sSnmpValue), ".")
+		if value == "[128 0]" { // [128 0]  (kept for compatibility with original WapSNMP behavior)
+			return "", fmt.Errorf("no Such Object available on this agent at this OID: %s", oid)
+		}
+		return value, nil*/
+}
+
+func interfaceToString(v interface{}) (string, error) {
+	// 使用 type switch 判断 b 的实际类型
+	switch v := v.(type) {
+	case nil:
+		return "", errors.New("返回值为 nil")
+	case string:
+		return fmt.Sprintf("%s", v), nil
+	case []byte:
+		return string(v), nil
+	case int:
+		return fmt.Sprintf("%d", v), nil
+	case int64:
+		return fmt.Sprintf("%d", v), nil
+	case float64:
+		fmt.Printf("类型是 float64: %.2f\n", v)
+	case bool:
+		return fmt.Sprintf("%t", v), nil
+	case []interface{}:
+		//fmt.Printf("类型是 []interface{}: %v\n", v)
+		return fmt.Sprintf("%v", v), nil
 	}
-	return value, nil
+	return fmt.Sprintf("%v", v), errors.New(fmt.Sprintf("未知数据类型 %T", v))
 }
 
 // GetMultiple to get SNMP values by oid slice
@@ -200,7 +228,8 @@ func (s *Snmp) Walk(oid string) (map[string]string, error) {
 	}
 	res := make(map[string]string)
 	for k, v := range result {
-		res[strings.Trim(k, ".")] = fmt.Sprintf("%+v", v)
+		tv, _ := interfaceToString(v)
+		res[strings.Trim(k, ".")] = fmt.Sprintf("%v", tv)
 	}
 	return res, nil
 }
