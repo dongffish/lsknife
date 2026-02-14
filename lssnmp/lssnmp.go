@@ -30,8 +30,8 @@ func (s *Snmp) init() {
 	s.Retries = 1
 }
 
-// Get to get a SNMP value by oid string
-func (s *Snmp) Get(oid string) (string, error) {
+//GetReturnInterface  Get to get SNMP value by oid string
+func (s *Snmp) GetReturnInterface(oid string) (interface{}, error) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered", r)
@@ -39,7 +39,6 @@ func (s *Snmp) Get(oid string) (string, error) {
 	}()
 	sOid, err := wapsnmp.ParseOid(oid)
 	if err != nil {
-		//lslog.Logger.Debugf("%s snmpget -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
 		return "", err
 	}
 	version := wapsnmp.SNMPv2c
@@ -57,14 +56,22 @@ func (s *Snmp) Get(oid string) (string, error) {
 		return "", fmt.Errorf("error creating wsnmp => %v", err)
 	}
 	defer wsnmp.Close()
-	sSnmpValue, err := wsnmp.Get(sOid)
+	return wsnmp.Get(sOid)
+}
+
+// Get to get SNMP value by oid string
+func (s *Snmp) Get(oid string) (string, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered", r)
+		}
+	}()
+	sSnmpValue, err := s.GetReturnInterface(oid) //wsnmp.Get(sOid)
 	if sSnmpValue == nil {
-		//lslog.Logger.Debugf("%s snmpget -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
 		return "", err
 	}
 	value := strings.Trim(fmt.Sprintf("%v", sSnmpValue), ".")
 	if value == "[128 0]" { // [128 0]
-		//lslog.Logger.Debugf("%s snmpget -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
 		return "", fmt.Errorf("no Such Object available on this agent at this OID: %s", oid)
 	}
 	return value, nil
@@ -153,9 +160,55 @@ func (s SortedWalkSlice) Less(i, j int) bool {
 
 // SortWalk snmp walk function return with a sorted result slice
 func (s *Snmp) SortWalk(oid string) (SortedWalkSlice, error) {
+	/*	defer func() {
+			if r := recover(); r != nil {
+				fmt.Println("Recovered in SortWalk(oid)", oid)
+			}
+		}()
+		version := wapsnmp.SNMPv2c
+		switch strings.ToLower(s.Version) {
+		case "1", "v1", "snmpv1":
+			version = wapsnmp.SNMPv1
+		case "2", "2c", "v2", "v2c", "snmpv2", "snmpv2c":
+			version = wapsnmp.SNMPv2c
+		default:
+			return nil, errors.New("Not supported version: " + s.Version)
+		}
+		sOid, err := wapsnmp.ParseOid(oid)
+		if err != nil {
+			//lslog.Logger.Debugf("%s snmpwalk -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
+			return nil, err
+		}
+
+		wsnmp, err := wapsnmp.NewWapSNMP(s.Host, s.CommStr, version, time.Duration(s.Timeout)*time.Second, s.Retries)
+		if err != nil {
+			//lslog.Logger.Debugf("%s snmpwalk -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
+			return nil, fmt.Errorf("error creating wsnmp => %v", err)
+		}
+		defer wsnmp.Close()
+		result, err := wsnmp.GetTable(sOid)
+		if err != nil {
+			return nil, err
+		}
+	*/
+
+	result, err := s.WalkReturnInterface(oid)
+	if err != nil {
+		return nil, err
+	}
+	res := make(SortedWalkSlice, 0, len(result))
+	for k, v := range result {
+		res = append(res, WalkResult{Oid: strings.Trim(k, "."), Value: fmt.Sprintf("%+v", v)})
+	}
+	sort.Sort(res)
+	return res, nil
+}
+
+// WalkReturnInterface Walk to get do snmp walk
+func (s *Snmp) WalkReturnInterface(oid string) (map[string]interface{}, error) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("Recovered in SortWalk(oid)", oid)
+			fmt.Println("Recovered in Walk(oid)", oid)
 		}
 	}()
 	version := wapsnmp.SNMPv2c
@@ -169,32 +222,30 @@ func (s *Snmp) SortWalk(oid string) (SortedWalkSlice, error) {
 	}
 	sOid, err := wapsnmp.ParseOid(oid)
 	if err != nil {
-		//lslog.Logger.Debugf("%s snmpwalk -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
 		return nil, err
 	}
 
 	wsnmp, err := wapsnmp.NewWapSNMP(s.Host, s.CommStr, version, time.Duration(s.Timeout)*time.Second, s.Retries)
 	if err != nil {
-		//lslog.Logger.Debugf("%s snmpwalk -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
 		return nil, fmt.Errorf("error creating wsnmp => %v", err)
 	}
 	defer wsnmp.Close()
-	result, err := wsnmp.GetTable(sOid)
-	if err != nil {
-		return nil, err
-	}
-
-	res := make(SortedWalkSlice, 0, len(result))
-	for k, v := range result {
-		res = append(res, WalkResult{Oid: strings.Trim(k, "."), Value: fmt.Sprintf("%+v", v)})
-	}
-	sort.Sort(res)
-	return res, nil
+	//result, err := wsnmp.GetTable(sOid)
+	return wsnmp.GetTable(sOid)
+	/*
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[string]string)
+		for k, v := range result {
+			res[strings.Trim(k, ".")] = fmt.Sprintf("%+v", v)
+		}
+		return res, nil*/
 }
 
 // Walk to get do snmp walk
 func (s *Snmp) Walk(oid string) (map[string]string, error) {
-	defer func() {
+	/*defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in Walk(oid)", oid)
 		}
@@ -219,8 +270,10 @@ func (s *Snmp) Walk(oid string) (map[string]string, error) {
 		//lslog.Logger.Debugf("%s snmpwalk -c %s -v %s -t %d -r %d %s %s", lslog.GetLogPrefix(), s.CommStr, s.Version, s.Timeout, s.Retries, s.Host, oid)
 		return nil, fmt.Errorf("error creating wsnmp => %v", err)
 	}
-	defer wsnmp.Close()
-	result, err := wsnmp.GetTable(sOid)
+	defer wsnmp.Close()*/
+
+	//result, err := wsnmp.GetTable(sOid)
+	result, err := s.WalkReturnInterface(oid)
 	if err != nil {
 		return nil, err
 	}
