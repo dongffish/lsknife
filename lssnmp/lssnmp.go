@@ -186,12 +186,19 @@ func (s *Snmp) SortWalk(oid string) (SortedWalkSlice, error) {
 	if err != nil {
 		return nil, err
 	}
-	res := make(SortedWalkSlice, 0, len(result))
+
+	res := make(map[string]string)
 	for k, v := range result {
-		res = append(res, WalkResult{Oid: strings.Trim(k, "."), Value: fmt.Sprintf("%+v", v)})
+		tv, _ := interfaceToString(v)
+		res[strings.Trim(k, ".")] = fmt.Sprintf("%v", tv)
 	}
-	sort.Sort(res)
-	return res, nil
+
+	res2 := make(SortedWalkSlice, 0, len(res))
+	for k, v := range res {
+		res2 = append(res2, WalkResult{Oid: strings.Trim(k, "."), Value: fmt.Sprintf("%+v", v)})
+	}
+	sort.Sort(res2)
+	return res2, nil
 }
 
 // WalkReturnInterface Walk to get do snmp walk
