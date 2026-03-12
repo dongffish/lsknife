@@ -98,17 +98,22 @@ func interfaceToString(v interface{}) (string, error) {
 		return string(v), nil
 	case int:
 		return fmt.Sprintf("%d", v), nil
+	case uint:
+		return fmt.Sprintf("%d", v), nil
 	case int64:
 		return fmt.Sprintf("%d", v), nil
 	case float64:
-		fmt.Printf("类型是 float64: %.2f\n", v)
+		return fmt.Sprintf("%f", v), nil
 	case bool:
 		return fmt.Sprintf("%t", v), nil
 	case []interface{}:
-		//fmt.Printf("类型是 []interface{}: %v\n", v)
+		fmt.Printf("类型是 []interface{}: %v\n", v)
+		return fmt.Sprintf("%v", v), nil
+	default:
+		fmt.Printf("未知数据类型 %T", v)
 		return fmt.Sprintf("%v", v), nil
 	}
-	return fmt.Sprintf("%v", v), errors.New(fmt.Sprintf("未知数据类型 %T", v))
+	//	return fmt.Sprintf("%v", v), errors.New(fmt.Sprintf("未知数据类型 %T", v))
 }
 
 // GetMultiple to get SNMP values by oid slice
