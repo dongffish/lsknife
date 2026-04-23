@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -31,6 +32,9 @@ func (s *Snmp) init() {
 	s.Retries = 1
 }
 
+var snmpMutex sync.Mutex
+var snmpMutexWalk sync.Mutex
+
 // GetReturnInterface  Get to get SNMP value by oid string
 func (s *Snmp) GetReturnInterface(oid string) (interface{}, error) {
 	defer func() {
@@ -38,6 +42,9 @@ func (s *Snmp) GetReturnInterface(oid string) (interface{}, error) {
 			fmt.Println("Recovered", r)
 		}
 	}()
+
+	snmpMutex.Lock()
+	defer snmpMutex.Unlock()
 
 	gs := s.newGoSNMP()
 	if err := gs.Connect(); err != nil {
@@ -135,46 +142,8 @@ func TransInterface2String(v interface{}) (string, string, error) {
 		return fmt.Sprint(val), fmt.Sprintf("%T", v), nil
 	default:
 		// 对于其他类型，使用默认格式
-		fmt.Printf("未知数据类型，使用默认格式： %T\n", v)
+		//fmt.Printf("未知数据类型，使用默认格式： %T\n", v)
 		return fmt.Sprint(val), fmt.Sprintf("%T", v), nil
-	}
-}
-
-func interfaceToString111(v interface{}) (string, error) {
-	// 使用 type switch 判断 b 的实际类型
-	switch v := v.(type) {
-	case nil:
-		return "", errors.New("返回值为 nil")
-	case string:
-		return fmt.Sprintf("%s", v), nil
-	case []byte:
-		return string(v), nil
-	case int:
-		return fmt.Sprintf("%d", v), nil
-	case uint:
-		return fmt.Sprintf("%d", v), nil
-	case uint8:
-		return fmt.Sprintf("%d", v), nil
-	case uint16:
-		return fmt.Sprintf("%d", v), nil
-	case uint32:
-		return fmt.Sprintf("%d", v), nil
-	case int64:
-		return fmt.Sprintf("%d", v), nil
-	case uint64:
-		return fmt.Sprintf("%d", v), nil
-	case float64:
-		return fmt.Sprintf("%f", v), nil
-	case float32:
-		return fmt.Sprintf("%f", v), nil
-	case bool:
-		return fmt.Sprintf("%t", v), nil
-	case []interface{}:
-		fmt.Printf("类型是 []interface{}: %v\n", v)
-		return fmt.Sprintf("%v", v), nil
-	default:
-		fmt.Printf("未知数据类型 %T\n", v)
-		return fmt.Sprintf("%v", v), nil
 	}
 }
 
@@ -275,6 +244,9 @@ func (s *Snmp) WalkReturnInterface(oid string) (map[string]interface{}, error) {
 			fmt.Println("Recovered in Walk(oid)", oid)
 		}
 	}()
+
+	snmpMutexWalk.Lock()
+	defer snmpMutexWalk.Unlock()
 
 	gs := s.newGoSNMP()
 	if err := gs.Connect(); err != nil {
