@@ -57,3 +57,6 @@ func LastDateOfMonth(enterTime time.Time) string {
 	lastDate := middle.AddDate(0, 1, -1).Format("2006-01-02")
 	return lastDate
 }
+func TimeNow() string {
+	return time.Now().Format("2006-01-02 15:04:05")
+}

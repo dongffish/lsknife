@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -32,9 +31,6 @@ func (s *Snmp) init() {
 	s.Retries = 1
 }
 
-var snmpMutex sync.Mutex
-var snmpMutexWalk sync.Mutex
-
 // GetReturnInterface  Get to get SNMP value by oid string
 func (s *Snmp) GetReturnInterface(oid string) (interface{}, error) {
 	defer func() {
@@ -42,10 +38,6 @@ func (s *Snmp) GetReturnInterface(oid string) (interface{}, error) {
 			fmt.Println("Recovered", r)
 		}
 	}()
-
-	snmpMutex.Lock()
-	defer snmpMutex.Unlock()
-
 	gs := s.newGoSNMP()
 	if err := gs.Connect(); err != nil {
 		return "", fmt.Errorf("error connecting snmp: %v", err)
@@ -244,10 +236,6 @@ func (s *Snmp) WalkReturnInterface(oid string) (map[string]interface{}, error) {
 			fmt.Println("Recovered in Walk(oid)", oid)
 		}
 	}()
-
-	snmpMutexWalk.Lock()
-	defer snmpMutexWalk.Unlock()
-
 	gs := s.newGoSNMP()
 	if err := gs.Connect(); err != nil {
 		return nil, fmt.Errorf("error connecting snmp: %v", err)
