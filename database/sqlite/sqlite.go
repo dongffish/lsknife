@@ -47,9 +47,10 @@ func GormSQLite(dbFile string) (*gorm.DB, error) {
 	}
 
 	// 以下设置连接池信息
-	sqlDB.SetMaxIdleConns(50)                   // 用于设置连接池中空闲连接的最在数量
-	sqlDB.SetMaxOpenConns(50)                   // 用于打开数据连接的最大数量
-	sqlDB.SetConnMaxLifetime(time.Second * 100) // 设置了连接可复用的最大时间(秒)
+	sqlDB.SetMaxIdleConns(10)                                  // 用于设置连接池中空闲连接的最在数量
+	sqlDB.SetMaxOpenConns(50)                                  // 用于打开数据连接的最大数量
+	sqlDB.SetConnMaxLifetime(time.Second * 1800)               // 设置了连接可复用的最大时间(秒)
+	sqlDB.SetConnMaxIdleTime(time.Second * time.Duration(300)) // 设置了连接空闲的最大时间(秒)
 
 	return db, err
 }

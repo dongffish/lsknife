@@ -71,6 +71,7 @@ func GormMssql(iniSection, PasswordDecryptionKey string) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(dbCfg.MaxIdleConns)                                    // 用于设置连接池中空闲连接的最在数量
 	sqlDB.SetMaxOpenConns(dbCfg.MaxOpenConns)                                    // 用于打开数据连接的最大数量
 	sqlDB.SetConnMaxLifetime(time.Second * time.Duration(dbCfg.ConnMaxLifetime)) // 设置了连接可复用的最大时间(秒)
+	sqlDB.SetConnMaxIdleTime(time.Second * time.Duration(dbCfg.ConnMaxIdleTime)) // 设置了连接空闲的最大时间(秒)
 
 	return db, err
 }
@@ -98,12 +99,14 @@ func GormMssqlByDSN(dsn string) (*gorm.DB, error) {
 	}
 
 	// 以下设置连接池信息
-	MaxIdleConns := 600
-	MaxOpenConns := 600
-	ConnMaxLifetime := 150
+	MaxIdleConns := 20
+	MaxOpenConns := 100
+	ConnMaxLifetime := 1800
+	ConnMaxIdleTime := 300
 	sqlDB.SetMaxIdleConns(MaxIdleConns)                                    // 用于设置连接池中空闲连接的最在数量
 	sqlDB.SetMaxOpenConns(MaxOpenConns)                                    // 用于打开数据连接的最大数量
 	sqlDB.SetConnMaxLifetime(time.Second * time.Duration(ConnMaxLifetime)) // 设置了连接可复用的最大时间(秒)
+	sqlDB.SetConnMaxIdleTime(time.Second * time.Duration(ConnMaxIdleTime)) // 设置了连接空闲的最大时间(秒)
 
 	return db, err
 }

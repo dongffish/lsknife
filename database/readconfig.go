@@ -20,9 +20,10 @@ type DBConfig struct {
 	DBPassword      string // 数据库密码
 	Database        string // 数据库名
 	Charset         string // 数据库编码
-	MaxOpenConns    int    // 50  用于设置最大打开的连接数，默认值为0表示不限制。
-	MaxIdleConns    int    // 50  用于设置闲置的连接数
-	ConnMaxLifetime int    // 秒	(100 * time.Second) , 给db设置一个超时时间，时间小于数据库的超时时间即可
+	MaxOpenConns    int    // 100  这是最重要的参数，用于防止应用压垮数据库。切忌设置为0（无限制）。建议从 CPU核心数 × 2~3 起步，并确保不超过MySQL服务器 max_connections 的 80%
+	MaxIdleConns    int    // 20 设置原则：核心目标是保持适量的“热连接”以减少建连开销。通常建议设置为 MaxOpenConns 的 25% ~ 50%。如果设置过高，空闲连接会长期占用数据库资源。
+	ConnMaxLifetime int    // 1800秒，	(100 * time.Second) , 设置原则：主动轮换连接，避免使用因数据库或中间件（如ProxySQL、RDS）主动断开的“僵尸连接”。必须设置，且应小于数据库的 wait_timeout
+	ConnMaxIdleTime int    // 300秒，连接最大空闲时间	(100 * time.Second) ,设置原则：这是对 MaxIdleConns 的精细化补充，用于及时释放闲置过久的连接，避免它们占用池子却因超时失效。建议设置为 5~10分钟
 	ShowSQL         int    //执行时是否显示SQL, 1-是  0-否
 	//DiscardLog      bool   //`xml:"DiscardLog"`
 	ConnString string // 数据库连接字符串
@@ -65,14 +66,19 @@ func ReadDBConfig(dbSection, PasswordDecryptionKey string) (*DBConfig, error) {
 	dbCfg.MaxOpenConns = viper.GetInt(dbSection + ".MaxOpenConns")
 	dbCfg.MaxIdleConns = viper.GetInt(dbSection + ".MaxIdleConns")
 	dbCfg.ConnMaxLifetime = viper.GetInt(dbSection + ".ConnMaxLifetime")
+	dbCfg.ConnMaxIdleTime = viper.GetInt(dbSection + ".ConnMaxIdleTime")
+	
 	if dbCfg.MaxOpenConns == 0 {
 		dbCfg.MaxOpenConns = 100
 	}
 	if dbCfg.MaxIdleConns == 0 {
-		dbCfg.MaxIdleConns = 100
+		dbCfg.MaxIdleConns = 20
 	}
 	if dbCfg.ConnMaxLifetime == 0 {
-		dbCfg.ConnMaxLifetime = 100
+		dbCfg.ConnMaxLifetime = 1800
+	}
+	if dbCfg.ConnMaxIdleTime == 0 {
+		dbCfg.ConnMaxIdleTime = 300
 	}
 	if PasswordDecryptionKey != "" {
 		var b []byte
